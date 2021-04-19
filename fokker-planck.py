@@ -1,9 +1,11 @@
 import numpy as np 
 from fenics import IntervalMesh, FunctionSpace, DOLFIN_EPS, Constant, \
                    TrialFunction, TestFunction, Function, solve, plot, File, \
-                   dot, grad, dx, Expression, interpolate, lhs, rhs, inner, \
-                       TensorFunctionSpace, project, DirichletBC, SubDomain
+                   grad, dx, Expression, interpolate, lhs, rhs, inner, set_log_level
 import matplotlib.pyplot as plt
+import itertools
+import pandas as pd
+# from joblib import Parallel, delayed 
 
 # Modified from class notes to apply FEM to the Fokker-Planck Equation. 
 
@@ -67,23 +69,48 @@ def run_fokker_planck(nx, num_steps, mu=0, sigma=1, t_0 = 0, t_final=1,
             plot(u_h, label='t = %s' % t)
     
     
-    filename = "fpe/fokker-planck-" + str(t) + ".pvd"
-    file = File(filename)
-    file << u_n
+    # filename = "fpe/fokker-planck-" + str(t) + ".pvd"
+    # file = File(filename)
+    # file << u_n
 
     plt.legend() 
     plt.grid()
-    plt.title("Finite Element Solutions to Fokker-Planck Equation with $\mu$ = %s, $\sigma$ = %s" % (mu, sigma))
+    plt.title("Finite Element Solutions to Fokker-Planck Equation with $\mu$ = %s, $\sigma$ = %s, $t_n$ = %s" % (mu, sigma, t_final))
     plt.ylabel("$u(x, t)$")
     plt.xlabel("x")
-    plt.savefig("fpe/fokker-planck-solutions.png")
+    plt.savefig("fpe/fokker-planck-solutions-mu-%s-sigma-%s-t_final-%s.png" % (mu, sigma, t_final))
 
-    return u_n 
+    plt.clf() 
+
+    # return the approximate solution evaluated on the coordinates, and the actual coordinates. 
+    return u_n.compute_vertex_values(), mesh.coordinates() 
 
 
 if __name__ == "__main__":
-    nx = 500
-    num_steps = 100
-    sol = run_fokker_planck(nx, num_steps, mu=2, sigma=2, t_final=0.1)
+
+    set_log_level(40)
+
+    nxs = np.arange(20, 1000, 70)
+    times = np.arange(20, 1000, 70)
+
+    # nxs = [50] 
+    # times = [50]
+
+    params = list(itertools.product(nxs, times)) 
+
+    result_lst = []
+
+    for nx, num_steps in params:
+
+        print("="*8 + " Running %s, %s " % (nx, num_steps) + '='*8)
+        sol, xvals = run_fokker_planck(nx, num_steps, mu=1.5, sigma=1, t_final=1)
+        results = {'nx': nx, 
+                   'num_steps': num_steps,
+                   'xvals': xvals.flatten(), 
+                   'sol': sol.flatten()}
+        result_lst.append(results)
+
+    result_df = pd.DataFrame(result_lst)
+    result_df.to_csv("fpe/results.csv", index=False)
 
 
